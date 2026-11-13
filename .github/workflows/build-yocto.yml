@@ -28,7 +28,7 @@ concurrency:
 env:
   CACHE_DIR: /efsx/qli/meta-qcom
   KAS_CLONE_DEPTH: 1
-  KAS_CONTAINER: ${{ github.workspace }}/kas-container
+  KAS_CONTAINER: ${{ github.workspace }}/ci/kas-container
   KAS_CONTAINER_IMAGE: ghcr.io/siemens/kas/kas@sha256:3f3d3257e8d4ca3adfcb2e0025e6da24339fb8d68a6999ca36c37381351582d5 # 5.5-9-g0555188
 
 jobs:
@@ -40,13 +40,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setting up kas-container
+      - name: Check kas-container version
         run: |
-          docker create --name kas ${KAS_CONTAINER_IMAGE}
-          docker cp kas:/usr/local/bin/kas-container $KAS_CONTAINER
           LATEST=$(git ls-remote --tags --refs --sort="v:refname" https://github.com/siemens/kas | tail -n1 | sed 's/.*\///')
-          if ! grep -q "KAS_CONTAINER_SCRIPT_VERSION=\"${LATEST}\"" $KAS_CONTAINER ; then
-            echo "Version "${LATEST}" of kas is available, please update "KAS_CONTAINER_IMAGE: $KAS_CONTAINER_IMAGE""
+          CURRENT=$(${KAS_CONTAINER} --version | cut -d' ' -f 2)
+          if [[ "${CURRENT}" != "${LATEST}" ]]; then
+            echo "Version "${LATEST}" of kas is available and we are at "${CURRENT}", please update "KAS_CONTAINER_IMAGE: $KAS_CONTAINER_IMAGE""
           fi
 
       - name: Run kas lock
@@ -60,7 +59,6 @@ jobs:
           if-no-files-found: error
           path: |
             ci/*.lock.yml
-            kas-container
 
   github-cache-check:
     needs: kas-setup
@@ -78,6 +76,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: kas
+          path: ci
 
       - name: Compute build input hash
         id: hash
@@ -130,10 +129,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: kas
-
-      - name: Setting up kas-container
-        run: |
-          chmod +x $KAS_CONTAINER
+          path: ci
 
       - name: Setup cache variables (used by oe-selftest)
         run: |
@@ -376,27 +372,27 @@ jobs:
           - type: 6.18
             dirname: "_linux-qcom-6.18"
             yamlfile: ":ci/linux-qcom-6.18.yml"
-          - type: rt-6.18-distro-kvm
-            dirname: "_linux-qcom-rt-6.18_qcom-distro-kvm"
-            yamlfile: ":ci/linux-qcom-rt-6.18.yml:ci/qcom-distro-kvm.yml"
+          - type: rt-6.18
+            dirname: "_linux-qcom-rt-6.18"
+            yamlfile: ":ci/linux-qcom-rt-6.18.yml:ci/kvm.yml"
         exclude:
           # 6.18 RT selects qcom-distro by default, remove others
           - distro:
                 name: nodistro
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           - distro:
                 name: qcom-distro-catchall
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           - distro:
                 name: debug
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           - distro:
                 name: performance
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           # Exclude jobs from compile_stage2
           - machine: glymur-crd
             distro:
@@ -413,13 +409,13 @@ jobs:
                 type: 6.18
           - machine: mahua-crd
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           - machine: nord-rrd
             kernel:
                 type: 6.18
           - machine: nord-rrd
             kernel:
-                type: rt-6.18-distro-kvm
+                type: rt-6.18
           - machine: qcom-armv8a
             distro:
                 name: nodistro
@@ -474,6 +470,42 @@ jobs:
                 type: default
                 dirname: ""
                 yamlfile: ""
+          - machine: iq-615-evk
+            distro:
+                name: qcom-distro-gunyah
+                yamlfile: ':ci/qcom-distro.yml:ci/gunyah.yml'
+                profile: extended
+            kernel:
+                type: default
+                dirname: ""
+                yamlfile: ""
+          - machine: iq-8275-evk
+            distro:
+                name: qcom-distro-gunyah
+                yamlfile: ':ci/qcom-distro.yml:ci/gunyah.yml'
+                profile: extended
+            kernel:
+                type: default
+                dirname: ""
+                yamlfile: ""
+          - machine: iq-9075-evk
+            distro:
+                name: qcom-distro-gunyah
+                yamlfile: ':ci/qcom-distro.yml:ci/gunyah.yml'
+                profile: extended
+            kernel:
+                type: default
+                dirname: ""
+                yamlfile: ""
+          - machine: rb3gen2-core-kit
+            distro:
+                name: qcom-distro-gunyah
+                yamlfile: ':ci/qcom-distro.yml:ci/gunyah.yml'
+                profile: extended
+            kernel:
+                type: default
+                dirname: ""
+                yamlfile: ""
           - machine: qcom-armv7a
             distro:
                 name: nodistro
@@ -490,54 +522,6 @@ jobs:
                 type: default
                 dirname: ""
                 yamlfile: ""
-          - machine: qcs615-ride
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
-          - machine: rb3gen2-core-kit
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
-          - machine: iq-9075-evk
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
-          - machine: iq-615-evk
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
-          - machine: shikra-evk
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
-          - machine: iq-8275-evk
-            distro:
-                name: qcom-distro-catchall
-                yamlfile: ':ci/qcom-distro-catchall.yml'
-            kernel:
-                type: u-boot-qcom-6.18
-                dirname: "_linux-qcom-6.18_u-boot-qcom"
-                yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
           - machine: rb3gen2-core-kit-open-fw
             distro:
                 name: qcom-distro
@@ -548,16 +532,16 @@ jobs:
                 yamlfile: ""
           - machine: iq-9075-evk-open-fw
             distro:
-                name: qcom-distro-kvm
-                yamlfile: ':ci/qcom-distro-kvm.yml'
+                name: qcom-distro
+                yamlfile: ':ci/qcom-distro.yml'
             kernel:
                 type: default
                 dirname: ""
                 yamlfile: ""
           - machine: iq-9075-evk-open-fw-spl
             distro:
-                name: qcom-distro-kvm
-                yamlfile: ':ci/qcom-distro-kvm.yml'
+                name: qcom-distro
+                yamlfile: ':ci/qcom-distro.yml'
             kernel:
                 type: kernel-fit
                 dirname: "_kernel-fit"
@@ -627,8 +611,66 @@ jobs:
       cache_dir: ${{ needs.compile-env.outputs.CACHE_DIR }}
       profile: ${{ inputs.profile }}
 
+  # Build the catchall distro, and its performance variant, against the
+  # u-boot-qcom bootloader for the machines that enable it, across both the
+  # linux-qcom-6.18 and linux-qcom-next kernels. catchall + u-boot-qcom-6.18
+  # builds in every profile, matching the compile_stage3 include rows it
+  # replaces; the performance distro and the linux-qcom-next kernel are gated
+  # to extended through a profile on their respective matrix axes.
+  compile_uboot:
+    needs: [github-cache-check, compile_stage2, compile-env]
+    if: |
+      github.repository_owner == 'qualcomm-linux' &&
+      (inputs.skip_if_github_cached != true || needs.github-cache-check.outputs.cache_hit != 'true')
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        machine:
+          - qcs615-ride
+          - rb3gen2-core-kit
+          - iq-9075-evk
+          - iq-615-evk
+          - shikra-evk
+          - iq-8275-evk
+        distro:
+          - name: qcom-distro-catchall
+            yamlfile: ':ci/qcom-distro-catchall.yml'
+          - name: performance
+            yamlfile: ':ci/qcom-distro-catchall.yml:ci/performance.yml:ci/nospdx.yml'
+            profile: extended
+        kernel:
+          - type: u-boot-qcom-6.18
+            dirname: "_linux-qcom-6.18_u-boot-qcom"
+            yamlfile: ":ci/linux-qcom-6.18.yml:ci/u-boot-qcom.yml"
+          - type: u-boot-qcom-next
+            dirname: "_linux-qcom-next_u-boot-qcom"
+            yamlfile: ":ci/linux-qcom-next.yml:ci/u-boot-qcom.yml"
+            profile: extended
+    uses: $/.github/workflows/compile.yml
+    with:
+      name: ${{ matrix.machine }}/${{ matrix.distro.name }}${{ matrix.kernel.dirname }}
+      # Which profiles build this entry. Both the distro and the kernel axis
+      # may carry a profile; the entry builds only in a profile that satisfies
+      # both, so the narrower of the two wins. An axis without a profile is
+      # built by every profile; one marked with a profile is built by that
+      # profile and the wider ones above it, ordered pr < full (push and
+      # nightly) < extended.
+      enabled: ${{ ((matrix.distro.profile || 'any') == 'any' || (matrix.distro.profile == 'full' && inputs.profile != 'pr') || (matrix.distro.profile == 'extended' && inputs.profile == 'extended')) && ((matrix.kernel.profile || 'any') == 'any' || (matrix.kernel.profile == 'full' && inputs.profile != 'pr') || (matrix.kernel.profile == 'extended' && inputs.profile == 'extended')) }}
+      world: false
+      machine: ${{matrix.machine}}
+      distro_yaml: ${{matrix.distro.yamlfile}}
+      distro_name: ${{matrix.distro.name}}
+      kernel_yaml: ${{matrix.kernel.yamlfile}}
+      kernel_dirname: ${{matrix.kernel.dirname}}
+      cache_dir: ${{ needs.compile-env.outputs.CACHE_DIR }}
+      profile: ${{ inputs.profile }}
+
   publish_summary:
-    needs: [github-cache-check, compile_stage3, compile_sdk, testimage]
+    needs: [github-cache-check, compile_stage3, compile_uboot, compile_sdk, testimage]
     if: |
       always() && github.repository_owner == 'qualcomm-linux' &&
       (inputs.skip_if_github_cached != true || needs.github-cache-check.outputs.cache_hit != 'true')
@@ -644,12 +686,11 @@ jobs:
           pattern: build-url*
 
   github-cache-save:
-    needs: [github-cache-check, compile_stage3, compile_sdk, testimage]
+    needs: [github-cache-check, compile_stage3, compile_uboot, compile_sdk, testimage]
     if: |
       github.repository_owner == 'qualcomm-linux' &&
       inputs.skip_if_github_cached == true &&
-      needs.github-cache-check.outputs.cache_hit != 'true' &&
-      needs.compile_stage3.result == 'success'
+      needs.github-cache-check.outputs.cache_hit != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Create build success marker
@@ -662,8 +703,11 @@ jobs:
           key: build-success-${{ github.repository }}-${{ github.workflow }}-${{ github.ref_name }}-${{ needs.github-cache-check.outputs.run_hash }}
 
   build_successful:
-    if: github.repository_owner == 'qualcomm-linux'
-    needs: [compile_stage3, compile_sdk, testimage]
+    needs: [compile_stage3, compile_uboot, compile_sdk, testimage]
+    if: |
+      always() && github.repository_owner == 'qualcomm-linux' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
       - name: Build completed successfully

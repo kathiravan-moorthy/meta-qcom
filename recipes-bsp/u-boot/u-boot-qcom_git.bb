@@ -12,15 +12,16 @@ DEPENDS += "${@bb.utils.contains('QCOM_UBOOT_SPL_FIT', '1', '${QCOM_UBOOT_SPL_FI
 
 COMPATIBLE_MACHINE:aarch64 = "(qcom)"
 
-PV = "2026.07+2026.10-rc1+git"
+PV = "2026.10+git"
 
-# tag: qcom-next-v2026.10-rc1-20260915
-SRCREV = "5ec66cb5c3f29e2da1f55464109cae3fe8545b69"
+# tag: qcom-next-v2026.10-20261106
+SRCREV = "0766fef311064ef58a78282fd92c1eed74aa494b"
 SRCBRANCH = "nobranch=1"
 
 SRC_URI = "git://github.com/qualcomm-linux/u-boot.git;${SRCBRANCH};protocol=https;name=uboot"
 SRC_URI += " \
     file://0001-Add-support-for-OpenSSL-Provider-API.patch \
+    file://0002-configs-qcom-re-enable-the-SoC-clock-drivers-in-SPL.patch \
     file://disable-eficapsule-tool.cfg \
     file://efi-rt-volatile-store.cfg \
     ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'file://tfa-optee.cfg', '', d)} \
@@ -49,9 +50,6 @@ uboot_compile_config:append() {
         # Where uboot-sign's /incbin/ defaults expect them.
         install -m 0644 ${RECIPE_SYSROOT}/firmware/${QCOM_UBOOT_SPL_FIT_ATF}/bl31.bin ${B}/${builddir}/bl31.bin
         install -m 0644 ${RECIPE_SYSROOT}${nonarch_base_libdir}/firmware/tee-raw.bin ${B}/${builddir}/tee-raw.bin
-    elif [ -n "${config_mbn_header}" ]; then
-        export CRYPTOGRAPHY_OPENSSL_NO_LEGACY=1
-        qtestsign -${config_mbn_header} aboot -o ${B}/${builddir}/u-boot.mbn ${B}/${builddir}/u-boot.elf
     fi
 }
 
